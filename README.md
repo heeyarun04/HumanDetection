@@ -1,13 +1,13 @@
-# Human Detection as Automation Indicator in Smart Office Dashboard ✨
+## Human Detection as Automation Indicator in Smart Office Dashboard ✨
 
-## Setup environment
+### Setup environment
 ```
 py -m venv .venv
 .venv\Scripts\activate
 pip install opencv-python streamlit-webrtc ultralytics torch streamlit 
 ```
 
-## Run steamlit app
+### Run steamlit app
 ```
 streamlit run dashboard.py
 ```
