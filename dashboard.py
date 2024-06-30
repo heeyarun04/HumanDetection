@@ -1,70 +1,54 @@
+# Python In-built packages
+from pathlib import Path
+
+# External packages
 import streamlit as st
-import logging
-import cv2
-import torch
-from ultralytics import YOLO
-from streamlit_webrtc import webrtc_streamer
 
-# Configure logging
-logger = logging.getLogger("streamlit_webrtc")
-logger.setLevel(logging.DEBUG)
+# Local Modules
+import settings
+import helper
 
-# Stream handler for console output
-handler = logging.StreamHandler()
-handler.setLevel(logging.DEBUG)
-formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
-handler.setFormatter(formatter)
-logger.addHandler(handler)
-
-# Load YOLOv8 model
-model = YOLO('yolov8m.pt')  # Use a pre-trained YOLOv8 model
-
-# App title
-st.title("Human Detection as Indicator Automation")
-
-# Streamlit WebRTC configuration
-webrtc_ctx = webrtc_streamer(
-    key="example",
-    video_processor_factory=None,
-    rtc_configuration={"iceServers": [{"urls": ["stun:stun.l.google.com:19302"]}]},
-    media_stream_constraints={"video": True, "audio": False}
+# Setting page layout
+st.set_page_config(
+    page_title="Human Detection using YOLOv8",
+    page_icon="🤖",
+    layout="wide",
+    initial_sidebar_state="expanded"
 )
 
-# Logging initialization message
-logger.info("WebRTC streamer initialized.")
+# Main page heading
+st.title("Human Detection as Automation Indicator")
 
-if webrtc_ctx.video_receiver:
-    # Initialize the VideoCapture object for IP camera
-    cap = cv2.VideoCapture("192.168.43.254")
-    logger.info("VideoCapture object created for IP camera.")
+# Sidebar
+st.sidebar.header("ML Model Detection Config")
 
-    while True:
-        # Read frame from IP camera
-        ret, frame = cap.read()
-        if not ret:
-            logger.error("Failed to read frame from IP camera.")
-            break
+# Model Options
+confidence = float(st.sidebar.slider(
+    "Select Model Confidence", 25, 100, 40)) / 100
 
-        # Perform object detection
-        results = model(frame)
+# Selecting Detection Or Segmentation
+model_path = Path(settings.DETECTION_MODEL)
 
-        # Draw bounding boxes and labels on the frame
-        for result in results.xyxy[0]:  # x1, y1, x2, y2, confidence, class
-            x1, y1, x2, y2, conf, cls = result
-            if int(cls) == 0:  # Class 0 is 'person' in COCO dataset
-                cv2.rectangle(frame, (int(x1), int(y1)), (int(x2), int(y2)), (255, 0, 0), 2)
-                label = f'Person: {conf:.2f}'
-                cv2.putText(frame, label, (int(x1), int(y1)-10), cv2.FONT_HERSHEY_SIMPLEX, 0.9, (255, 0, 0), 2)
-                logger.info(f"Human detected at [{x1}, {y1}, {x2}, {y2}] with confidence {conf:.2f}")
 
-        # Display the frame in Streamlit
-        webrtc_ctx.video_receiver.process_frame(frame)
-        st.image(frame, channels="BGR")
+# Load Pre-trained ML Model
+try:
+    model = helper.load_model(model_path)
+except Exception as ex:
+    st.error(f"Unable to load model. Check the specified path: {model_path}")
+    st.error(ex)
 
-    # Release the VideoCapture object and cleanup
-    cap.release()
-    cv2.destroyAllWindows()
-    logger.info("VideoCapture object released and resources cleaned up.")
+st.sidebar.header("Image/Video Config")
+source_radio = st.sidebar.radio(
+    "Select Source", settings.SOURCES_LIST)
+
+
+# If image is selected
+if source_radio == settings.WEBCAM:
+    helper.play_webcam(confidence, model)
+
+elif source_radio == settings.RTSP:
+    helper.play_rtsp_stream(confidence, model)
+
 else:
-    logger.warning("No video receiver available.")
+    st.error("Please select a valid source type!")
 
